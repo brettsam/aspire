@@ -2,8 +2,12 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Data;
+using System.Net;
 using Aspire.Components.Common.Tests;
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Postgres;
+using Aspire.Hosting.Testing;
+using Aspire.Hosting.Tests.Utils;
 using Aspire.Hosting.Utils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +21,30 @@ namespace Aspire.Hosting.PostgreSQL.Tests;
 
 public class PostgresFunctionalTests(ITestOutputHelper testOutputHelper)
 {
+    [Fact]
+    [RequiresDocker]
+    public async Task VerifyPgAdminResource()
+    {
+        using var builder = TestDistributedApplicationBuilder.CreateWithTestContainerRegistry(testOutputHelper);
+
+        IResourceBuilder<PgAdminContainerResource>? adminBuilder = null;
+        var redis = builder.AddPostgres("postgres").WithPgAdmin(c => adminBuilder = c);
+        Assert.NotNull(adminBuilder);
+
+        using var app = builder.Build();
+
+        await app.StartAsync();
+
+        await app.WaitForTextAsync("Listening at", resourceName: adminBuilder.Resource.Name);
+
+        var client = app.CreateHttpClient(adminBuilder.Resource.Name, "http");
+
+        var endpoint = redis.GetEndpoint("tcp");
+        var path = $"/";
+        var response = await client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     [Fact]
     [RequiresDocker]
     public async Task VerifyPostgresResource()

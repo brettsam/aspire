@@ -692,4 +692,20 @@ public static class ResourceBuilderExtensions
             KnownResourceStates.TerminalStates.Contains(snapshot.State?.Text) &&
             snapshot.ExitCode is not null;
     }
+
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+#pragma warning disable RS0016 // Add public types and members to the declared API
+    public static IResourceBuilder<T> WithCommand<T>(
+        this IResourceBuilder<T> builder,
+        string type,
+        string displayName,
+        Func<CustomResourceSnapshot, Task<bool>> visible,
+        Func<string, IServiceProvider, Task> invokeCommand,
+        string? iconContent,
+        bool isHighlighted) where T : IResource
+    {
+        return builder.WithAnnotation(new ResourceCommandAnnotation(type, displayName, visible, invokeCommand, iconContent, isHighlighted));
+    }
+#pragma warning restore RS0016 // Add public types and members to the declared API
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 }

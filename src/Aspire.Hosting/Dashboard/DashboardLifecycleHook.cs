@@ -22,7 +22,6 @@ namespace Aspire.Hosting.Dashboard;
 internal sealed class DashboardLifecycleHook(IConfiguration configuration,
                                              IOptions<DashboardOptions> dashboardOptions,
                                              ILogger<DistributedApplication> distributedApplicationLogger,
-                                             IDashboardEndpointProvider dashboardEndpointProvider,
                                              DistributedApplicationExecutionContext executionContext,
                                              ResourceNotificationService resourceNotificationService,
                                              ResourceLoggerService resourceLoggerService,
@@ -150,7 +149,8 @@ internal sealed class DashboardLifecycleHook(IConfiguration configuration,
             var browserToken = options.DashboardToken;
             var otlpApiKey = options.OtlpApiKey;
 
-            var resourceServiceUrl = await dashboardEndpointProvider.GetResourceServiceUriAsync(context.CancellationToken).ConfigureAwait(false);
+            // Get service from provider to avoid circular reference.
+            var resourceServiceUrl = await executionContext.ServiceProvider.GetRequiredService<IDashboardEndpointProvider>().GetResourceServiceUriAsync(context.CancellationToken).ConfigureAwait(false);
 
             context.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = environment;
             context.EnvironmentVariables[DashboardConfigNames.DashboardFrontendUrlName.EnvVarName] = dashboardUrls;

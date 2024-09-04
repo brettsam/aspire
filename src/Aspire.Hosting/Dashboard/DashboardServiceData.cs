@@ -15,15 +15,18 @@ internal sealed class DashboardServiceData : IAsyncDisposable
 {
     private readonly CancellationTokenSource _cts = new();
     private readonly ResourcePublisher _resourcePublisher;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ResourceLoggerService _resourceLoggerService;
 
     public DashboardServiceData(
         ResourceNotificationService resourceNotificationService,
         ResourceLoggerService resourceLoggerService,
-        ILogger<DashboardServiceData> logger)
+        ILogger<DashboardServiceData> logger,
+        IServiceProvider serviceProvider)
     {
         _resourceLoggerService = resourceLoggerService;
         _resourcePublisher = new ResourcePublisher(_cts.Token);
+        _serviceProvider = serviceProvider;
 
         var cancellationToken = _cts.Token;
 
@@ -41,7 +44,8 @@ internal sealed class DashboardServiceData : IAsyncDisposable
                     Environment = snapshot.EnvironmentVariables,
                     ExitCode = snapshot.ExitCode,
                     State = snapshot.State?.Text,
-                    StateStyle = snapshot.State?.Style
+                    StateStyle = snapshot.State?.Style,
+                    Commands = snapshot.Commands
                 };
             }
 
@@ -58,7 +62,7 @@ internal sealed class DashboardServiceData : IAsyncDisposable
                         logger.LogDebug("Updating resource snapshot for {Name}/{DisplayName}: {State}", snapshot.Name, snapshot.DisplayName, snapshot.State);
                     }
 
-                    await _resourcePublisher.IntegrateAsync(snapshot, ResourceSnapshotChangeType.Upsert)
+                    await _resourcePublisher.IntegrateAsync(snapshot, @event.Resource, ResourceSnapshotChangeType.Upsert)
                             .ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -75,6 +79,18 @@ internal sealed class DashboardServiceData : IAsyncDisposable
         await _cts.CancelAsync().ConfigureAwait(false);
 
         _cts.Dispose();
+    }
+
+    internal async Task ExecuteCommandAsync(string resourceId, string type)
+    {
+        if (_resourcePublisher.TryGetResource(resourceId, out _, out var resource))
+        {
+            var annotation = resource.Annotations.OfType<ResourceCommandAnnotation>().SingleOrDefault(a => a.Type == type);
+            if (annotation != null)
+            {
+                await annotation.InvokeCommand(resourceId, _serviceProvider).ConfigureAwait(false);
+            }
+        }
     }
 
     internal ResourceSnapshotSubscription SubscribeResources()

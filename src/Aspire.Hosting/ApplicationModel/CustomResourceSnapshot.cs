@@ -44,6 +44,12 @@ public sealed record CustomResourceSnapshot
     /// The URLs that should show up in the dashboard for this resource.
     /// </summary>
     public ImmutableArray<UrlSnapshot> Urls { get; init; } = [];
+
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+#pragma warning disable RS0016 // Add public types and members to the declared API
+    public ImmutableArray<ResourceCommandSnapshot> Commands { get; init; } = [];
+#pragma warning restore RS0016 // Add public types and members to the declared API
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 }
 
 /// <summary>
@@ -83,6 +89,12 @@ public sealed record UrlSnapshot(string Name, string Url, bool IsInternal);
 /// <param name="Name">The name of the property.</param>
 /// <param name="Value">The value of the property.</param>
 public sealed record ResourcePropertySnapshot(string Name, object? Value);
+
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+#pragma warning disable RS0016 // Add public types and members to the declared API
+public sealed record ResourceCommandSnapshot(string Type, string DisplayName, string? IconContent, bool IsHighlighted);
+#pragma warning restore RS0016 // Add public types and members to the declared API
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 
 /// <summary>
 /// The set of well known resource states.

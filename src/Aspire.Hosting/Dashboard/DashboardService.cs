@@ -142,4 +142,14 @@ internal sealed partial class DashboardService(DashboardServiceData serviceData,
             }
         }
     }
+
+    public override async Task<ResourceCommandResponse> ExecuteResourceCommand(ResourceCommandRequest request, ServerCallContext context)
+    {
+        await serviceData.ExecuteCommandAsync(request.ResourceName, request.CommandType).ConfigureAwait(false);
+
+        return new ResourceCommandResponse
+        {
+            Kind = ResourceCommandResponseKind.Succeeded
+        };
+    }
 }

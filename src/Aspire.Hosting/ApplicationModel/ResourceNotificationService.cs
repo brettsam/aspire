@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Hosting;
@@ -179,13 +180,37 @@ public class ResourceNotificationService
     /// <param name="resource">The resource to update</param>
     /// <param name="resourceId"> The id of the resource.</param>
     /// <param name="stateFactory">A factory that creates the new state based on the previous state.</param>
-    public Task PublishUpdateAsync(IResource resource, string resourceId, Func<CustomResourceSnapshot, CustomResourceSnapshot> stateFactory)
+    public async Task PublishUpdateAsync(IResource resource, string resourceId, Func<CustomResourceSnapshot, CustomResourceSnapshot> stateFactory)
     {
         var notificationState = GetResourceNotificationState(resource, resourceId);
 
-        lock (notificationState)
+        await notificationState.Lock.WaitAsync().ConfigureAwait(false);
+
+        try
         {
             var previousState = GetCurrentSnapshot(resource, notificationState);
+
+            // TODO: Order matters. Switch to KeyedCollection.
+            var commands = previousState.Commands.ToDictionary(c => c.Type);
+
+            foreach (var commandAnnotation in resource.Annotations.OfType<ResourceCommandAnnotation>())
+            {
+                var visible = true;
+                if (commandAnnotation.Visible is { } visibleFunc)
+                {
+                    visible = await visibleFunc(previousState).ConfigureAwait(false);
+                }
+                if (visible)
+                {
+                    commands[commandAnnotation.Type] = new ResourceCommandSnapshot(commandAnnotation.Type, commandAnnotation.DisplayName, commandAnnotation.IconContent, commandAnnotation.IsHighlighted);
+                }
+                else
+                {
+                    commands.Remove(commandAnnotation.Type);
+                }
+            }
+
+            previousState = previousState with { Commands = commands.Values.ToImmutableArray() };
 
             var newState = stateFactory(previousState);
 
@@ -219,8 +244,10 @@ public class ResourceNotificationService
                     newState.ExitCode, string.Join(", ", newState.EnvironmentVariables.Select(e => $"{e.Name} = {e.Value}")), string.Join(", ", newState.Urls.Select(u => $"{u.Name} = {u.Url}")),
                     string.Join(", ", newState.Properties.Select(p => $"{p.Name} = {p.Value}")));
             }
-
-            return Task.CompletedTask;
+        }
+        finally
+        {
+            notificationState.Lock.Release();
         }
     }
 
@@ -265,6 +292,7 @@ public class ResourceNotificationService
     private sealed class ResourceNotificationState
     {
         public CustomResourceSnapshot? LastSnapshot { get; set; }
+        public SemaphoreSlim Lock { get; } = new SemaphoreSlim(1);
     }
 }
 

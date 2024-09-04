@@ -23,6 +23,7 @@ internal abstract class ResourceSnapshot
     public required ImmutableArray<EnvironmentVariableSnapshot> Environment { get; init; }
 
     public required ImmutableArray<UrlSnapshot> Urls { get; init; }
+    public required ImmutableArray<ResourceCommandSnapshot> Commands { get; init; }
 
     protected abstract IEnumerable<(string Key, Value Value)> GetProperties();
 

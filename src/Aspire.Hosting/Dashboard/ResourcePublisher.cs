@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using Aspire.Hosting.ApplicationModel;
 
 namespace Aspire.Hosting.Dashboard;
 
@@ -16,17 +17,25 @@ namespace Aspire.Hosting.Dashboard;
 internal sealed class ResourcePublisher(CancellationToken cancellationToken)
 {
     private readonly object _syncLock = new();
-    private readonly Dictionary<string, ResourceSnapshot> _snapshot = [];
+    private readonly Dictionary<string, (ResourceSnapshot, IResource)> _snapshot = [];
     private ImmutableHashSet<Channel<ResourceSnapshotChange>> _outgoingChannels = [];
 
     // For testing purposes
     internal int OutgoingSubscriberCount => _outgoingChannels.Count;
 
-    internal bool TryGetResource(string resourceName, [NotNullWhen(returnValue: true)] out ResourceSnapshot? resource)
+    internal bool TryGetResource(string resourceName, [NotNullWhen(returnValue: true)] out ResourceSnapshot? snapshot, [NotNullWhen(returnValue: true)] out IResource? resource)
     {
         lock (_syncLock)
         {
-            return _snapshot.TryGetValue(resourceName, out resource);
+            if (_snapshot.TryGetValue(resourceName, out var r))
+            {
+                (snapshot, resource) = r;
+                return true;
+            }
+
+            snapshot = null;
+            resource = null;
+            return false;
         }
     }
 
@@ -40,7 +49,7 @@ internal sealed class ResourcePublisher(CancellationToken cancellationToken)
             ImmutableInterlocked.Update(ref _outgoingChannels, static (set, channel) => set.Add(channel), channel);
 
             return new ResourceSnapshotSubscription(
-                InitialState: _snapshot.Values.ToImmutableArray(),
+                InitialState: _snapshot.Values.Select(r => r.Item1).ToImmutableArray(),
                 Subscription: StreamUpdates());
 
             async IAsyncEnumerable<IReadOnlyList<ResourceSnapshotChange>> StreamUpdates([EnumeratorCancellation] CancellationToken enumeratorCancellationToken = default)
@@ -66,9 +75,10 @@ internal sealed class ResourcePublisher(CancellationToken cancellationToken)
     /// Integrates a changed resource within the cache, and broadcasts the update to any subscribers.
     /// </summary>
     /// <param name="resource">The resource that was modified.</param>
+    /// <param name="resourceModel">The resource model.</param>
     /// <param name="changeType">The change type (Added, Modified, Deleted).</param>
     /// <returns>A task that completes when the cache has been updated and all subscribers notified.</returns>
-    internal async ValueTask IntegrateAsync(ResourceSnapshot resource, ResourceSnapshotChangeType changeType)
+    internal async ValueTask IntegrateAsync(ResourceSnapshot resource, IResource resourceModel, ResourceSnapshotChangeType changeType)
     {
         ImmutableHashSet<Channel<ResourceSnapshotChange>> channels;
 
@@ -77,7 +87,7 @@ internal sealed class ResourcePublisher(CancellationToken cancellationToken)
             switch (changeType)
             {
                 case ResourceSnapshotChangeType.Upsert:
-                    _snapshot[resource.Name] = resource;
+                    _snapshot[resource.Name] = (resource, resourceModel);
                     break;
 
                 case ResourceSnapshotChangeType.Delete:

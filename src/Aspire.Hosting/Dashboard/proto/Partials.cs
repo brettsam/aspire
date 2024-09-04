@@ -40,6 +40,11 @@ partial class Resource
             resource.Properties.Add(new ResourceProperty { Name = property.Name, Value = property.Value });
         }
 
+        foreach (var command in snapshot.Commands)
+        {
+            resource.Commands.Add(new ResourceCommand { CommandType = command.Type, DisplayName = command.DisplayName, IconContent = command.IconContent, IsHighlighted = command.IsHighlighted });
+        }
+
         // Disable start/stop/restart commands until host/DCP infrastructure is ready.
         /*
         if (snapshot.ResourceType is KnownResourceTypes.Project or KnownResourceTypes.Container or KnownResourceTypes.Executable)

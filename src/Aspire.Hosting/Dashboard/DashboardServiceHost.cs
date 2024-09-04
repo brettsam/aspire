@@ -49,7 +49,7 @@ internal sealed class DashboardServiceHost : IHostedService
     public DashboardServiceHost(
         DistributedApplicationOptions options,
         DistributedApplicationModel applicationModel,
-        IKubernetesService kubernetesService,
+        ApplicationExecutor applicationExecutor,
         IConfiguration configuration,
         DistributedApplicationExecutionContext executionContext,
         ILoggerFactory loggerFactory,
@@ -109,7 +109,7 @@ internal sealed class DashboardServiceHost : IHostedService
 
             builder.Services.AddGrpc();
             builder.Services.AddSingleton(applicationModel);
-            builder.Services.AddSingleton(kubernetesService);
+            builder.Services.AddSingleton(applicationExecutor);
             builder.Services.AddSingleton<DashboardServiceData>();
             builder.Services.AddSingleton(resourceNotificationService);
             builder.Services.AddSingleton(resourceLoggerService);

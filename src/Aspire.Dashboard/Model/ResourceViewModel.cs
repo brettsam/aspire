@@ -61,24 +61,33 @@ public sealed class ResourceViewModel
 public sealed class CommandViewModel
 {
     public string CommandType { get; }
+    public CommandViewModelState State { get; }
     public string DisplayName { get; }
     public string? ConfirmationMessage { get; }
     public Value? Parameter { get; }
     public bool IsHighlighted { get; }
     public string? IconContent { get; }
 
-    public CommandViewModel(string commandType, string displayName, string? confirmationMessage, Value? parameter, bool isHighlighted, string? iconContent)
+    public CommandViewModel(string commandType, CommandViewModelState state, string displayName, string? confirmationMessage, Value? parameter, bool isHighlighted, string? iconContent)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(commandType);
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
 
         CommandType = commandType;
+        State = state;
         DisplayName = displayName;
         ConfirmationMessage = confirmationMessage;
         Parameter = parameter;
         IsHighlighted = isHighlighted;
         IconContent = iconContent;
     }
+}
+
+public enum CommandViewModelState
+{
+    Enabled,
+    Disabled,
+    Hidden
 }
 
 [DebuggerDisplay("Name = {Name}, Value = {Value}, FromSpec = {FromSpec}, IsValueMasked = {IsValueMasked}")]

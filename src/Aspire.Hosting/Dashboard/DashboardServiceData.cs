@@ -81,16 +81,46 @@ internal sealed class DashboardServiceData : IAsyncDisposable
         _cts.Dispose();
     }
 
-    internal async Task ExecuteCommandAsync(string resourceId, string type)
+    internal async Task<(ExecuteCommandResult result, string? errorMessage)> ExecuteCommandAsync(string resourceId, string type, CancellationToken cancellationToken)
     {
+        var logger = _resourceLoggerService.GetLogger(resourceId);
+
+        logger.LogInformation($"Executing command '{type}'.");
         if (_resourcePublisher.TryGetResource(resourceId, out _, out var resource))
         {
             var annotation = resource.Annotations.OfType<ResourceCommandAnnotation>().SingleOrDefault(a => a.Type == type);
             if (annotation != null)
             {
-                await annotation.InvokeCommand(resourceId, _serviceProvider).ConfigureAwait(false);
+                try
+                {
+                    var context = new ExecuteCommandContext
+                    {
+                        ResourceName = resourceId,
+                        ServiceProvider = _serviceProvider,
+                        CancellationToken = cancellationToken
+                    };
+
+                    await annotation.ExecuteCommand(context).ConfigureAwait(false);
+                    logger.LogInformation($"Successfully executed command '{type}'.");
+                    return (ExecuteCommandResult.Success, null);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, $"Error executing command '{type}'.");
+                    return (ExecuteCommandResult.Failure, ex.Message);
+                }
             }
         }
+
+        logger.LogInformation($"Command '{type}' not available.");
+        return (ExecuteCommandResult.Canceled, null);
+    }
+
+    internal enum ExecuteCommandResult
+    {
+        Success,
+        Failure,
+        Canceled
     }
 
     internal ResourceSnapshotSubscription SubscribeResources()

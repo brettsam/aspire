@@ -92,7 +92,14 @@ public sealed record ResourcePropertySnapshot(string Name, object? Value);
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 #pragma warning disable RS0016 // Add public types and members to the declared API
-public sealed record ResourceCommandSnapshot(string Type, string DisplayName, string? IconContent, bool IsHighlighted);
+public sealed record ResourceCommandSnapshot(string Type, ResourceCommandState State, string DisplayName, string? IconContent, bool IsHighlighted);
+
+public enum ResourceCommandState
+{
+    Enabled,
+    Disabled,
+    Hidden
+}
 #pragma warning restore RS0016 // Add public types and members to the declared API
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 

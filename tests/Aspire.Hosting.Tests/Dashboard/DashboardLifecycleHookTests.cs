@@ -39,7 +39,6 @@ public class DashboardLifecycleHookTests
             configuration,
             Options.Create(new DashboardOptions { DashboardPath = "test.dll" }),
             NullLogger<DistributedApplication>.Instance,
-            new TestDashboardEndpointProvider(),
             new DistributedApplicationExecutionContext(DistributedApplicationOperation.Run),
             resourceNotificationService,
             resourceLoggerService,

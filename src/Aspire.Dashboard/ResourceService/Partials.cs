@@ -58,8 +58,19 @@ partial class Resource
         ImmutableArray<CommandViewModel> GetCommands()
         {
             return Commands
-                .Select(c => new CommandViewModel(c.CommandType, c.DisplayName, c.ConfirmationMessage, c.Parameter, c.IsHighlighted, c.IconContent))
+                .Select(c => new CommandViewModel(c.CommandType, Map(c.State), c.DisplayName, c.ConfirmationMessage, c.Parameter, c.IsHighlighted, c.IconContent))
                 .ToImmutableArray();
+
+            static CommandViewModelState Map(ResourceCommandState state)
+            {
+                return state switch
+                {
+                    ResourceCommandState.Enabled => CommandViewModelState.Enabled,
+                    ResourceCommandState.Disabled => CommandViewModelState.Disabled,
+                    ResourceCommandState.Hidden => CommandViewModelState.Hidden,
+                    _ => throw new InvalidOperationException("Unknown state: " + state),
+                };
+            }
         }
 
         T ValidateNotNull<T>(T value, [CallerArgumentExpression(nameof(value))] string? expression = null) where T : class

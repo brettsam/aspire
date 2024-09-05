@@ -24,7 +24,7 @@
         }
         else
         {
-            <FluentMenuItem OnClick="() => HandleItemClicked(item)">
+            <FluentMenuItem OnClick="() => HandleItemClicked(item)" Disabled="@item.IsDisabled">
                 @item.Title
                 @if (!string.IsNullOrEmpty(item.Icon))
                 {

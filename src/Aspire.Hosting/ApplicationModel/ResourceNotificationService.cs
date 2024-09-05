@@ -190,27 +190,9 @@ public class ResourceNotificationService
         {
             var previousState = GetCurrentSnapshot(resource, notificationState);
 
-            // TODO: Order matters. Switch to KeyedCollection.
-            var commands = previousState.Commands.ToDictionary(c => c.Type);
+            var commands = BuildCommands(resource, previousState);
 
-            foreach (var commandAnnotation in resource.Annotations.OfType<ResourceCommandAnnotation>())
-            {
-                var visible = true;
-                if (commandAnnotation.Visible is { } visibleFunc)
-                {
-                    visible = await visibleFunc(previousState).ConfigureAwait(false);
-                }
-                if (visible)
-                {
-                    commands[commandAnnotation.Type] = new ResourceCommandSnapshot(commandAnnotation.Type, commandAnnotation.DisplayName, commandAnnotation.IconContent, commandAnnotation.IsHighlighted);
-                }
-                else
-                {
-                    commands.Remove(commandAnnotation.Type);
-                }
-            }
-
-            previousState = previousState with { Commands = commands.Values.ToImmutableArray() };
+            previousState = previousState with { Commands = commands };
 
             var newState = stateFactory(previousState);
 
@@ -249,6 +231,46 @@ public class ResourceNotificationService
         {
             notificationState.Lock.Release();
         }
+    }
+
+    private static ImmutableArray<ResourceCommandSnapshot> BuildCommands(IResource resource, CustomResourceSnapshot previousState)
+    {
+        var commandsBuilder = ImmutableArray.CreateBuilder<ResourceCommandSnapshot>();
+        var commandAnnotations = resource.Annotations.OfType<ResourceCommandAnnotation>().ToList();
+
+        var query =
+            from command in previousState.Commands
+            join commandAnnotation in commandAnnotations on command.Type equals commandAnnotation.Type into gj
+            from subgroup in gj.DefaultIfEmpty()
+            select new
+            {
+                Command = command,
+                Annotation = subgroup
+            };
+
+        foreach (var v in query)
+        {
+            var command = v.Command;
+            if (v.Annotation != null)
+            {
+                command = command with
+                {
+                    State = v.Annotation.UpdateState(new UpdateCommandStateContext { ResourceSnapshot = previousState })
+                };
+                commandAnnotations.Remove(v.Annotation);
+            }
+
+            commandsBuilder.Add(command);
+        }
+
+        foreach (var commandAnnotation in commandAnnotations)
+        {
+            var state = commandAnnotation.UpdateState(new UpdateCommandStateContext { ResourceSnapshot = previousState });
+
+            commandsBuilder.Add(new ResourceCommandSnapshot(commandAnnotation.Type, state, commandAnnotation.DisplayName, commandAnnotation.IconContent, commandAnnotation.IsHighlighted));
+        }
+
+        return commandsBuilder.ToImmutable();
     }
 
     /// <summary>

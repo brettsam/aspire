@@ -9,4 +9,5 @@ public class MenuButtonItem
     public string? Title { get; set; }
     public string? Icon { get; set; }
     public Func<Task>? OnClick { get; set; }
+    public bool IsDisabled { get; set; }
 }

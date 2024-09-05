@@ -9,44 +9,50 @@ namespace Aspire.Hosting.ApplicationModel;
 /// <summary>
 /// Represents a command annotation for a resource.
 /// </summary>
-[DebuggerDisplay("Type = {GetType().Name,nq}, Source = {Source}, Target = {Target}")]
+[DebuggerDisplay("Type = {GetType().Name,nq}, Type = {Type}")]
 public sealed class ResourceCommandAnnotation : IResourceAnnotation
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="ResourceCommandAnnotation"/> class.
     /// </summary>
-    public ResourceCommandAnnotation(string type, string displayName, Func<CustomResourceSnapshot, Task<bool>> visible, Func<string, IServiceProvider, Task> invokeCommand, string? iconContent, bool isHighlighted)
+    public ResourceCommandAnnotation(
+        string type,
+        string displayName,
+        Func<UpdateCommandStateContext, ResourceCommandState> updateState,
+        Func<ExecuteCommandContext, Task> executeCommand,
+        string? iconContent,
+        bool isHighlighted)
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(displayName);
 
         Type = type;
         DisplayName = displayName;
-        Visible = visible;
-        InvokeCommand = invokeCommand;
+        UpdateState = updateState;
+        ExecuteCommand = executeCommand;
         IconContent = iconContent;
         IsHighlighted = isHighlighted;
     }
 
     /// <summary>
-    /// Gets the source of the bind mount or name if a volume. Can be <c>null</c> if the mount is an anonymous volume.
+    /// 
     /// </summary>
     public string Type { get; }
 
     /// <summary>
-    /// Gets the target of the mount.
+    /// 
     /// </summary>
     public string DisplayName { get; }
 
     /// <summary>
     /// 
     /// </summary>
-    public Func<CustomResourceSnapshot, Task<bool>> Visible { get; }
+    public Func<UpdateCommandStateContext, ResourceCommandState> UpdateState { get; }
 
     /// <summary>
     /// 
     /// </summary>
-    public Func<string, IServiceProvider, Task> InvokeCommand { get; }
+    public Func<ExecuteCommandContext, Task> ExecuteCommand { get; }
 
     /// <summary>
     /// 
@@ -57,5 +63,37 @@ public sealed class ResourceCommandAnnotation : IResourceAnnotation
     /// 
     /// </summary>
     public bool IsHighlighted { get; }
+}
+
+/// <summary>
+/// 
+/// </summary>
+public class UpdateCommandStateContext
+{
+    /// <summary>
+    /// 
+    /// </summary>
+    public required CustomResourceSnapshot ResourceSnapshot { get; init; }
+}
+
+/// <summary>
+/// 
+/// </summary>
+public class ExecuteCommandContext
+{
+    /// <summary>
+    /// 
+    /// </summary>
+    public required IServiceProvider ServiceProvider { get; init; }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public required string ResourceName { get; init; }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public required CancellationToken CancellationToken { get; init; }
 }
 #pragma warning restore RS0016 // Add public types and members to the declared API

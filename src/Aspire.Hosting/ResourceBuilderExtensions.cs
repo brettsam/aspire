@@ -699,12 +699,19 @@ public static class ResourceBuilderExtensions
         this IResourceBuilder<T> builder,
         string type,
         string displayName,
-        Func<CustomResourceSnapshot, Task<bool>> visible,
-        Func<string, IServiceProvider, Task> invokeCommand,
+        Func<UpdateCommandStateContext, ResourceCommandState> updateState,
+        Func<ExecuteCommandContext, Task> executeCommand,
         string? iconContent,
         bool isHighlighted) where T : IResource
     {
-        return builder.WithAnnotation(new ResourceCommandAnnotation(type, displayName, visible, invokeCommand, iconContent, isHighlighted));
+        // Replace existing annotation with the same name.
+        var existingAnnotation = builder.Resource.Annotations.OfType<ResourceCommandAnnotation>().SingleOrDefault(a => a.Type == type);
+        if (existingAnnotation != null)
+        {
+            builder.Resource.Annotations.Remove(existingAnnotation);
+        }
+
+        return builder.WithAnnotation(new ResourceCommandAnnotation(type, displayName, updateState, executeCommand, iconContent, isHighlighted));
     }
 #pragma warning restore RS0016 // Add public types and members to the declared API
 #pragma warning restore CS1591 // Missing XML comment for publicly visible type or member

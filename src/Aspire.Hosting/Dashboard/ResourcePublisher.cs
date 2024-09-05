@@ -16,8 +16,10 @@ namespace Aspire.Hosting.Dashboard;
 /// </summary>
 internal sealed class ResourcePublisher(CancellationToken cancellationToken)
 {
+    private sealed record SourceAndResourceSnapshot(IResource Source, ResourceSnapshot Snapshot);
+
     private readonly object _syncLock = new();
-    private readonly Dictionary<string, (ResourceSnapshot, IResource)> _snapshot = [];
+    private readonly Dictionary<string, SourceAndResourceSnapshot> _snapshot = [];
     private ImmutableHashSet<Channel<ResourceSnapshotChange>> _outgoingChannels = [];
 
     // For testing purposes
@@ -29,7 +31,8 @@ internal sealed class ResourcePublisher(CancellationToken cancellationToken)
         {
             if (_snapshot.TryGetValue(resourceName, out var r))
             {
-                (snapshot, resource) = r;
+                snapshot = r.Snapshot;
+                resource = r.Source;
                 return true;
             }
 
@@ -49,7 +52,7 @@ internal sealed class ResourcePublisher(CancellationToken cancellationToken)
             ImmutableInterlocked.Update(ref _outgoingChannels, static (set, channel) => set.Add(channel), channel);
 
             return new ResourceSnapshotSubscription(
-                InitialState: _snapshot.Values.Select(r => r.Item1).ToImmutableArray(),
+                InitialState: _snapshot.Select(r => r.Value.Snapshot).ToImmutableArray(),
                 Subscription: StreamUpdates());
 
             async IAsyncEnumerable<IReadOnlyList<ResourceSnapshotChange>> StreamUpdates([EnumeratorCancellation] CancellationToken enumeratorCancellationToken = default)
@@ -74,11 +77,11 @@ internal sealed class ResourcePublisher(CancellationToken cancellationToken)
     /// <summary>
     /// Integrates a changed resource within the cache, and broadcasts the update to any subscribers.
     /// </summary>
-    /// <param name="resource">The resource that was modified.</param>
-    /// <param name="resourceModel">The resource model.</param>
+    /// <param name="source">The source resource.</param>
+    /// <param name="snapshot">The resource snapshot that was modified.</param>
     /// <param name="changeType">The change type (Added, Modified, Deleted).</param>
     /// <returns>A task that completes when the cache has been updated and all subscribers notified.</returns>
-    internal async ValueTask IntegrateAsync(ResourceSnapshot resource, IResource resourceModel, ResourceSnapshotChangeType changeType)
+    internal async ValueTask IntegrateAsync(IResource source, ResourceSnapshot snapshot, ResourceSnapshotChangeType changeType)
     {
         ImmutableHashSet<Channel<ResourceSnapshotChange>> channels;
 
@@ -87,11 +90,11 @@ internal sealed class ResourcePublisher(CancellationToken cancellationToken)
             switch (changeType)
             {
                 case ResourceSnapshotChangeType.Upsert:
-                    _snapshot[resource.Name] = (resource, resourceModel);
+                    _snapshot[snapshot.Name] = new SourceAndResourceSnapshot(source, snapshot);
                     break;
 
                 case ResourceSnapshotChangeType.Delete:
-                    _snapshot.Remove(resource.Name);
+                    _snapshot.Remove(snapshot.Name);
                     break;
             }
 
@@ -100,7 +103,7 @@ internal sealed class ResourcePublisher(CancellationToken cancellationToken)
 
         foreach (var channel in channels)
         {
-            await channel.Writer.WriteAsync(new(changeType, resource), cancellationToken).ConfigureAwait(false);
+            await channel.Writer.WriteAsync(new(changeType, snapshot), cancellationToken).ConfigureAwait(false);
         }
     }
 }

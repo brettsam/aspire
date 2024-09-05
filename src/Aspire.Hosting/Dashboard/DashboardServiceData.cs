@@ -62,7 +62,7 @@ internal sealed class DashboardServiceData : IAsyncDisposable
                         logger.LogDebug("Updating resource snapshot for {Name}/{DisplayName}: {State}", snapshot.Name, snapshot.DisplayName, snapshot.State);
                     }
 
-                    await _resourcePublisher.IntegrateAsync(snapshot, @event.Resource, ResourceSnapshotChangeType.Upsert)
+                    await _resourcePublisher.IntegrateAsync(@event.Resource, snapshot, ResourceSnapshotChangeType.Upsert)
                             .ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)

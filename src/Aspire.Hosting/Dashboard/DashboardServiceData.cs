@@ -85,7 +85,7 @@ internal sealed class DashboardServiceData : IAsyncDisposable
     {
         var logger = _resourceLoggerService.GetLogger(resourceId);
 
-        logger.LogInformation($"Executing command '{type}'.");
+        logger.LogInformation("Executing command '{Type}'.", type);
         if (_resourcePublisher.TryGetResource(resourceId, out _, out var resource))
         {
             var annotation = resource.Annotations.OfType<ResourceCommandAnnotation>().SingleOrDefault(a => a.Type == type);
@@ -101,18 +101,18 @@ internal sealed class DashboardServiceData : IAsyncDisposable
                     };
 
                     await annotation.ExecuteCommand(context).ConfigureAwait(false);
-                    logger.LogInformation($"Successfully executed command '{type}'.");
+                    logger.LogInformation("Successfully executed command '{Type}'.", type);
                     return (ExecuteCommandResult.Success, null);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, $"Error executing command '{type}'.");
+                    logger.LogError(ex, "Error executing command '{Type}'.", type);
                     return (ExecuteCommandResult.Failure, ex.Message);
                 }
             }
         }
 
-        logger.LogInformation($"Command '{type}' not available.");
+        logger.LogInformation("Command '{Type}' not available.", type);
         return (ExecuteCommandResult.Canceled, null);
     }
 

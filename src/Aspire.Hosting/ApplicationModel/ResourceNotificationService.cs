@@ -180,13 +180,11 @@ public class ResourceNotificationService
     /// <param name="resource">The resource to update</param>
     /// <param name="resourceId"> The id of the resource.</param>
     /// <param name="stateFactory">A factory that creates the new state based on the previous state.</param>
-    public async Task PublishUpdateAsync(IResource resource, string resourceId, Func<CustomResourceSnapshot, CustomResourceSnapshot> stateFactory)
+    public Task PublishUpdateAsync(IResource resource, string resourceId, Func<CustomResourceSnapshot, CustomResourceSnapshot> stateFactory)
     {
         var notificationState = GetResourceNotificationState(resource, resourceId);
 
-        await notificationState.Lock.WaitAsync().ConfigureAwait(false);
-
-        try
+        lock (notificationState)
         {
             var previousState = GetCurrentSnapshot(resource, notificationState);
 
@@ -227,10 +225,8 @@ public class ResourceNotificationService
                     string.Join(", ", newState.Properties.Select(p => $"{p.Name} = {p.Value}")));
             }
         }
-        finally
-        {
-            notificationState.Lock.Release();
-        }
+
+        return Task.CompletedTask;
     }
 
     private static ImmutableArray<ResourceCommandSnapshot> BuildCommands(IResource resource, CustomResourceSnapshot previousState)
@@ -238,6 +234,7 @@ public class ResourceNotificationService
         var commandsBuilder = ImmutableArray.CreateBuilder<ResourceCommandSnapshot>();
         var commandAnnotations = resource.Annotations.OfType<ResourceCommandAnnotation>().ToList();
 
+        // Left outer join of command snapshots and annotations.
         var query =
             from command in previousState.Commands
             join commandAnnotation in commandAnnotations on command.Type equals commandAnnotation.Type into gj
@@ -253,16 +250,23 @@ public class ResourceNotificationService
             var command = v.Command;
             if (v.Annotation != null)
             {
-                command = command with
+                var newState = v.Annotation.UpdateState(new UpdateCommandStateContext { ResourceSnapshot = previousState });
+
+                if (command.State != newState)
                 {
-                    State = v.Annotation.UpdateState(new UpdateCommandStateContext { ResourceSnapshot = previousState })
-                };
+                    command = command with
+                    {
+                        State = newState
+                    };
+                }
+
                 commandAnnotations.Remove(v.Annotation);
             }
 
             commandsBuilder.Add(command);
         }
 
+        // Add any remaining annotations as command snapshots.
         foreach (var commandAnnotation in commandAnnotations)
         {
             var state = commandAnnotation.UpdateState(new UpdateCommandStateContext { ResourceSnapshot = previousState });
@@ -314,7 +318,6 @@ public class ResourceNotificationService
     private sealed class ResourceNotificationState
     {
         public CustomResourceSnapshot? LastSnapshot { get; set; }
-        public SemaphoreSlim Lock { get; } = new SemaphoreSlim(1);
     }
 }
 

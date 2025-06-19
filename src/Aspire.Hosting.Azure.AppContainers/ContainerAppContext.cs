@@ -200,16 +200,10 @@ internal sealed class ContainerAppContext(IResource resource, ContainerAppEnviro
             //todo? we could match k8s secret repo by using "." instead of "-" for keys but need to replace here
             var secretName = paramSecret.Name.Replace("_", "-").ToLowerInvariant();
 
-            var bicepName = paramSecret.ValueExpression.Replace("{", "").Replace("}", "").Replace(".", "_").Replace("-", "_").ToLowerInvariant();
-            var provParam = new ProvisioningParameter(bicepName, typeof(string)) { IsSecure = true };
-
-            infra.AspireResource.Parameters[bicepName] = paramSecret;
-            infra.Add(provParam);
-
             var containerAppSecret = new ContainerAppWritableSecret()
             {
                 Name = secretName,
-                Value = provParam
+                Value = paramSecret.AsProvisioningParameter(infra)
             };
 
             app.Configuration.Secrets.Add(containerAppSecret);
